@@ -1,0 +1,66 @@
+{
+  "exportedAt": "2026-02-18T07:19:25.285Z",
+  "apiHost": "https://eu.posthog.com",
+  "projectId": "128239",
+  "requested": {
+    "limit": 1,
+    "recordingId": null,
+    "since": null,
+    "includeOngoing": false,
+    "pageSize": 25,
+    "blobBatchSize": 20
+  },
+  "recordings": [
+    {
+      "recordingId": "019c6f91-a428-7e4e-8b12-c31480d18210",
+      "distinctId": "019c6f91-a40c-7642-89cc-f249cc8f5942",
+      "timeline": {
+        "startTime": "2026-02-18T07:05:42.795000Z",
+        "endTime": "2026-02-18T07:05:54.729000Z",
+        "recordingDurationSec": 12,
+        "activeSeconds": 10,
+        "inactiveSeconds": 1
+      },
+      "interactionSignals": {
+        "clickCount": 37,
+        "keypressCount": 0,
+        "mouseActivityCount": 126
+      },
+      "errorSignals": {
+        "consoleLogCount": 0,
+        "consoleWarnCount": 0,
+        "consoleErrorCount": 0
+      },
+      "reconstructionInputs": {
+        "sourcesFile": "data/posthog-export/019c6f91-a428-7e4e-8b12-c31480d18210/sources.json",
+        "ndjsonChunks": [
+          "data/posthog-export/019c6f91-a428-7e4e-8b12-c31480d18210/events-0-1.ndjson"
+        ],
+        "minTimestampMs": 1771398342795,
+        "maxTimestampMs": 1771398354729,
+        "inferredDurationMs": 11934
+      },
+      "visionModelHints": {
+        "baseUrl": "https://signal-54fqvzlj1-borna471-gmailcoms-projects.vercel.app/",
+        "hasNetworkTimeline": true,
+        "hasConsoleTimeline": false,
+        "fullSnapshotEvents": 1,
+        "eventTypeCounts": {
+          "2": 1,
+          "3": 148,
+          "4": 1,
+          "5": 3,
+          "6": 2
+        }
+      },
+      "files": [
+        {
+          "startBlobKey": 0,
+          "endBlobKey": 1,
+          "file": "data/posthog-export/019c6f91-a428-7e4e-8b12-c31480d18210/events-0-1.ndjson",
+          "eventsInChunk": 155
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "totalEvents": 155,
+  "eventTypeCounts": {
+    "2": 1,
+    "3": 148,
+    "4": 1,
+    "5": 3,
+    "6": 2
+  },
+  "minTimestamp": 1771398342795,
+  "maxTimestamp": 1771398354729,
+  "inferredDurationMs": 11934,
+  "clickEvents": 29,
+  "mutationEvents": 2,
+  "fullSnapshotEvents": 1,
+  "hasConsolePluginEvents": false,
+  "hasNetworkPluginEvents": true
+}

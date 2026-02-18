@@ -1,0 +1,16 @@
+{
+  "sources": [
+    {
+      "source": "blob_v2",
+      "start_timestamp": "2026-02-18T07:05:42.795000Z",
+      "end_timestamp": "2026-02-18T07:05:47.203000Z",
+      "blob_key": "0"
+    },
+    {
+      "source": "blob_v2",
+      "start_timestamp": "2026-02-18T07:05:47.696000Z",
+      "end_timestamp": "2026-02-18T07:05:54.729000Z",
+      "blob_key": "1"
+    }
+  ]
+}
