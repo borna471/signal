@@ -67,6 +67,8 @@ button {
   background: linear-gradient(180deg, var(--panel), #121820);
   border-radius: 12px;
   padding: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .step-header {
@@ -211,7 +213,10 @@ button {
   border: 1px solid #242b36;
   border-radius: 8px;
   padding: 10px;
-  overflow: auto;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
   max-height: 360px;
   color: #d0d9e5;
   font-size: 0.78rem;
@@ -222,6 +227,57 @@ button {
   max-height: 620px;
 }
 
+.postprocess-wrap {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel), #121820);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.postprocess-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.postprocess-header > div {
+  min-width: 0;
+}
+
+.postprocess-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.postprocess-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  max-width: 860px;
+}
+
+.postprocess-header button {
+  border: 1px solid #3f4f69;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+  color: #f5faff;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.postprocess-header button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1100px) {
   .steps-grid {
     grid-template-columns: 1fr;
@@ -229,5 +285,10 @@ button {
 
   .output-grid {
     grid-template-columns: 1fr;
+  }
+
+  .postprocess-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

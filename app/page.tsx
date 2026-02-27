@@ -49,12 +49,25 @@ type BlobDataResponse = {
   error?: string;
 };
 
+type PostProcessResponse = {
+  ok: boolean;
+  error?: string;
+  postProcessing?: {
+    processedSnapshots?: Array<Record<string, unknown>>;
+    summary?: Record<string, unknown>;
+    notes?: Record<string, unknown>;
+  };
+  [key: string]: unknown;
+};
+
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
 export default function Page() {
-  const [loading, setLoading] = useState<null | 'projects' | 'recordings' | 'sources' | 'blobs'>(null);
+  const [loading, setLoading] = useState<
+    null | 'projects' | 'recordings' | 'sources' | 'blobs' | 'postprocess'
+  >(null);
   const [error, setError] = useState<string>('');
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -69,6 +82,7 @@ export default function Page() {
   const [selectedBlobKeys, setSelectedBlobKeys] = useState<string[]>([]);
   const [blobData, setBlobData] = useState<BlobDataResponse | null>(null);
   const [decompress, setDecompress] = useState<boolean>(true);
+  const [postProcessOutput, setPostProcessOutput] = useState<PostProcessResponse | null>(null);
 
   const selectedProject = useMemo(
     () => projects.find((project) => String(project.id) === selectedProjectId),
@@ -81,6 +95,13 @@ export default function Page() {
   );
 
   const blobSources = snapshotSources?.blobSources ?? [];
+
+  function clearDownstreamData() {
+    setSnapshotSources(null);
+    setSelectedBlobKeys([]);
+    setBlobData(null);
+    setPostProcessOutput(null);
+  }
 
   async function retrieveProjects() {
     setLoading('projects');
@@ -100,9 +121,7 @@ export default function Page() {
       setRecordings([]);
       setRecordingsRaw(null);
       setSelectedRecordingId('');
-      setSnapshotSources(null);
-      setSelectedBlobKeys([]);
-      setBlobData(null);
+      clearDownstreamData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve projects');
     } finally {
@@ -131,9 +150,7 @@ export default function Page() {
       setRecordings(payload.recordings ?? []);
       setRecordingsRaw(payload);
       setSelectedRecordingId('');
-      setSnapshotSources(null);
-      setSelectedBlobKeys([]);
-      setBlobData(null);
+      clearDownstreamData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve recordings');
     } finally {
@@ -162,6 +179,7 @@ export default function Page() {
       setSnapshotSources(payload);
       setSelectedBlobKeys([]);
       setBlobData(null);
+      setPostProcessOutput(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve snapshot sources');
     } finally {
@@ -183,6 +201,7 @@ export default function Page() {
       setError('');
       return [...current, blobKey];
     });
+    setPostProcessOutput(null);
   }
 
   async function retrieveSelectedBlobs() {
@@ -215,8 +234,41 @@ export default function Page() {
       }
 
       setBlobData(payload);
+      setPostProcessOutput(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve blob data');
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function runPostProcessing() {
+    if (!selectedProjectId || !selectedRecordingId || selectedBlobKeys.length === 0) {
+      return;
+    }
+
+    setLoading('postprocess');
+    setError('');
+
+    try {
+      const response = await fetch(
+        `/api/posthog/projects/${encodeURIComponent(selectedProjectId)}/recordings/${encodeURIComponent(selectedRecordingId)}/post-process`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blobKeys: selectedBlobKeys })
+        }
+      );
+
+      const payload: PostProcessResponse = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? 'Failed to post-process snapshots');
+      }
+
+      setPostProcessOutput(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to post-process snapshots');
     } finally {
       setLoading(null);
     }
@@ -250,9 +302,7 @@ export default function Page() {
                   setSelectedRecordingId('');
                   setRecordings([]);
                   setRecordingsRaw(null);
-                  setSnapshotSources(null);
-                  setSelectedBlobKeys([]);
-                  setBlobData(null);
+                  clearDownstreamData();
                 }}
               >
                 <strong>{project.name ?? 'Unnamed project'}</strong>
@@ -284,9 +334,7 @@ export default function Page() {
                 className={selectedRecordingId === recording.id ? 'list-item active' : 'list-item'}
                 onClick={() => {
                   setSelectedRecordingId(recording.id);
-                  setSnapshotSources(null);
-                  setSelectedBlobKeys([]);
-                  setBlobData(null);
+                  clearDownstreamData();
                 }}
               >
                 <strong>{recording.id}</strong>
@@ -350,7 +398,9 @@ export default function Page() {
                 </button>
               );
             })}
-            {!blobSources.length ? <div className="empty-state">Retrieve snapshot sources to list blob keys.</div> : null}
+            {!blobSources.length ? (
+              <div className="empty-state">Retrieve snapshot sources to list blob keys.</div>
+            ) : null}
           </div>
         </article>
       </section>
@@ -374,6 +424,30 @@ export default function Page() {
         <article className="output-panel output-wide">
           <h3>Selected blob data output</h3>
           <pre>{blobData ? formatJson(blobData) : 'No selected blob data payload yet.'}</pre>
+        </article>
+      </section>
+
+      <section className="postprocess-wrap">
+        <div className="postprocess-header">
+          <div>
+            <h2>4. Run Post-processing (PostHog-like)</h2>
+            <p>
+              Runs normalization, decompression of partially-compressed events, mobile meta patching, dedupe,
+              chrome-extension stripping, sorting, and meta-event patching.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={runPostProcessing}
+            disabled={!blobData || selectedBlobKeys.length === 0 || loading !== null}
+          >
+            {loading === 'postprocess' ? 'Processing...' : 'Run post-processing'}
+          </button>
+        </div>
+
+        <article className="output-panel output-wide">
+          <h3>Post-processing output</h3>
+          <pre>{postProcessOutput ? formatJson(postProcessOutput) : 'No post-processing result yet.'}</pre>
         </article>
       </section>
     </main>
