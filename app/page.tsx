@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import RRWebDemoPlayer from './components/RRWebDemoPlayer';
 
 type Project = {
   id: number | string;
@@ -83,6 +84,8 @@ export default function Page() {
   const [blobData, setBlobData] = useState<BlobDataResponse | null>(null);
   const [decompress, setDecompress] = useState<boolean>(true);
   const [postProcessOutput, setPostProcessOutput] = useState<PostProcessResponse | null>(null);
+  const [showDemoPlayer, setShowDemoPlayer] = useState<boolean>(false);
+  const [demoRenderKey, setDemoRenderKey] = useState<number>(0);
 
   const selectedProject = useMemo(
     () => projects.find((project) => String(project.id) === selectedProjectId),
@@ -95,12 +98,16 @@ export default function Page() {
   );
 
   const blobSources = snapshotSources?.blobSources ?? [];
+  const processedSnapshots = (postProcessOutput?.postProcessing?.processedSnapshots ?? []) as Array<
+    Record<string, unknown>
+  >;
 
   function clearDownstreamData() {
     setSnapshotSources(null);
     setSelectedBlobKeys([]);
     setBlobData(null);
     setPostProcessOutput(null);
+    setShowDemoPlayer(false);
   }
 
   async function retrieveProjects() {
@@ -235,6 +242,7 @@ export default function Page() {
 
       setBlobData(payload);
       setPostProcessOutput(null);
+      setShowDemoPlayer(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve blob data');
     } finally {
@@ -267,11 +275,22 @@ export default function Page() {
       }
 
       setPostProcessOutput(payload);
+      setShowDemoPlayer(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to post-process snapshots');
     } finally {
       setLoading(null);
     }
+  }
+
+  function generateDemoReplay() {
+    if (!processedSnapshots.length) {
+      setError('Run post-processing first so processed snapshots are available for replay.');
+      return;
+    }
+    setError('');
+    setShowDemoPlayer(true);
+    setDemoRenderKey((current) => current + 1);
   }
 
   return (
@@ -448,6 +467,38 @@ export default function Page() {
         <article className="output-panel output-wide">
           <h3>Post-processing output</h3>
           <pre>{postProcessOutput ? formatJson(postProcessOutput) : 'No post-processing result yet.'}</pre>
+        </article>
+      </section>
+
+      <section className="postprocess-wrap">
+        <div className="postprocess-header">
+          <div>
+            <h2>5. Generate Demo Replay Video View</h2>
+            <p>
+              Initializes rrweb-player with the post-processed snapshot timeline so you can watch the replay.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={generateDemoReplay}
+            disabled={!processedSnapshots.length || loading !== null}
+          >
+            Generate Demo Replay
+          </button>
+        </div>
+
+        <article className="output-panel output-wide">
+          <h3>RRWeb Demo Player</h3>
+          {showDemoPlayer ? (
+            <RRWebDemoPlayer
+              key={`${selectedRecordingId}-${processedSnapshots.length}-${demoRenderKey}`}
+              events={processedSnapshots}
+            />
+          ) : (
+            <div className="empty-state">
+              Run post-processing and click &quot;Generate Demo Replay&quot; to render the player.
+            </div>
+          )}
         </article>
       </section>
     </main>

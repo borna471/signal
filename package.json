@@ -13,7 +13,8 @@
     "next": "^16.1.6",
     "posthog-js": "^1.350.0",
     "react": "19.0.0",
-    "react-dom": "19.0.0"
+    "react-dom": "19.0.0",
+    "rrweb-player": "^1.0.0-alpha.4"
   },
   "devDependencies": {
     "@types/node": "22.10.7",
