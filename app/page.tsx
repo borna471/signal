@@ -1,41 +1,60 @@
 'use client';
 
+import { useMemo, useState } from 'react';
+
 type Project = {
   id: number | string;
   name?: string;
-  created_at?: string;
 };
 
 type Recording = {
   id: string;
   start_time?: string;
-  end_time?: string;
   recording_duration?: number;
-  ongoing?: boolean;
-  distinct_id?: string;
-  click_count?: number;
-  mouse_activity_count?: number;
 };
 
-type SnapshotResponse = {
+type BlobSource = {
+  source?: string;
+  start_timestamp?: string;
+  end_timestamp?: string;
+  blob_key?: string | number;
+};
+
+type SnapshotSourcesResponse = {
   ok: boolean;
   apiHost?: string;
   projectId?: string;
   recordingId?: string;
-  sources?: { sources?: Array<{ source?: string; blob_key?: number }> };
-  chunks?: Array<{ startBlobKey: number; endBlobKey: number; eventCount: number }>;
-  events?: Array<{ sessionId: string; event: Record<string, unknown> }>;
+  sources?: { sources?: BlobSource[] };
+  blobSources?: BlobSource[];
+  blobKeys?: string[];
   error?: string;
 };
 
-import { useMemo, useState } from 'react';
+type BlobDataResponse = {
+  ok: boolean;
+  apiHost?: string;
+  projectId?: string;
+  recordingId?: string;
+  selectedBlobKeys?: string[];
+  decompress?: boolean;
+  chunks?: Array<{ startBlobKey: number; endBlobKey: number; eventCount: number }>;
+  events?: Array<{ sessionId: string; event: Record<string, unknown> }>;
+  compressedChunks?: Array<{
+    startBlobKey: number;
+    endBlobKey: number;
+    byteLength: number;
+    contentBase64: string;
+  }>;
+  error?: string;
+};
 
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
 export default function Page() {
-  const [loading, setLoading] = useState<null | 'projects' | 'recordings' | 'snapshots'>(null);
+  const [loading, setLoading] = useState<null | 'projects' | 'recordings' | 'sources' | 'blobs'>(null);
   const [error, setError] = useState<string>('');
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -46,7 +65,10 @@ export default function Page() {
   const [recordingsRaw, setRecordingsRaw] = useState<unknown>(null);
   const [selectedRecordingId, setSelectedRecordingId] = useState<string>('');
 
-  const [snapshots, setSnapshots] = useState<SnapshotResponse | null>(null);
+  const [snapshotSources, setSnapshotSources] = useState<SnapshotSourcesResponse | null>(null);
+  const [selectedBlobKeys, setSelectedBlobKeys] = useState<string[]>([]);
+  const [blobData, setBlobData] = useState<BlobDataResponse | null>(null);
+  const [decompress, setDecompress] = useState<boolean>(true);
 
   const selectedProject = useMemo(
     () => projects.find((project) => String(project.id) === selectedProjectId),
@@ -57,6 +79,8 @@ export default function Page() {
     () => recordings.find((recording) => recording.id === selectedRecordingId),
     [recordings, selectedRecordingId]
   );
+
+  const blobSources = snapshotSources?.blobSources ?? [];
 
   async function retrieveProjects() {
     setLoading('projects');
@@ -76,7 +100,9 @@ export default function Page() {
       setRecordings([]);
       setRecordingsRaw(null);
       setSelectedRecordingId('');
-      setSnapshots(null);
+      setSnapshotSources(null);
+      setSelectedBlobKeys([]);
+      setBlobData(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve projects');
     } finally {
@@ -105,7 +131,9 @@ export default function Page() {
       setRecordings(payload.recordings ?? []);
       setRecordingsRaw(payload);
       setSelectedRecordingId('');
-      setSnapshots(null);
+      setSnapshotSources(null);
+      setSelectedBlobKeys([]);
+      setBlobData(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to retrieve recordings');
     } finally {
@@ -113,27 +141,82 @@ export default function Page() {
     }
   }
 
-  async function retrieveSnapshots() {
+  async function retrieveSnapshotSources() {
     if (!selectedProjectId || !selectedRecordingId) {
       return;
     }
 
-    setLoading('snapshots');
+    setLoading('sources');
     setError('');
 
     try {
       const response = await fetch(
         `/api/posthog/projects/${encodeURIComponent(selectedProjectId)}/recordings/${encodeURIComponent(selectedRecordingId)}/snapshots`
       );
-      const payload: SnapshotResponse = await response.json();
+      const payload: SnapshotSourcesResponse = await response.json();
 
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? 'Failed to retrieve snapshots');
+        throw new Error(payload.error ?? 'Failed to retrieve snapshot sources');
       }
 
-      setSnapshots(payload);
+      setSnapshotSources(payload);
+      setSelectedBlobKeys([]);
+      setBlobData(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to retrieve snapshots');
+      setError(err instanceof Error ? err.message : 'Failed to retrieve snapshot sources');
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  function toggleBlobKey(blobKey: string) {
+    setSelectedBlobKeys((current) => {
+      if (current.includes(blobKey)) {
+        return current.filter((key) => key !== blobKey);
+      }
+
+      if (current.length >= 20) {
+        setError('You can select up to 20 blob keys at a time.');
+        return current;
+      }
+
+      setError('');
+      return [...current, blobKey];
+    });
+  }
+
+  async function retrieveSelectedBlobs() {
+    if (!selectedProjectId || !selectedRecordingId || selectedBlobKeys.length === 0) {
+      return;
+    }
+
+    if (selectedBlobKeys.length > 20) {
+      setError('You can request at most 20 blob keys at a time.');
+      return;
+    }
+
+    setLoading('blobs');
+    setError('');
+
+    try {
+      const response = await fetch(
+        `/api/posthog/projects/${encodeURIComponent(selectedProjectId)}/recordings/${encodeURIComponent(selectedRecordingId)}/snapshots`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blobKeys: selectedBlobKeys, decompress })
+        }
+      );
+
+      const payload: BlobDataResponse = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? 'Failed to retrieve blob data');
+      }
+
+      setBlobData(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to retrieve blob data');
     } finally {
       setLoading(null);
     }
@@ -143,7 +226,7 @@ export default function Page() {
     <main className="explorer-shell">
       <header className="explorer-header">
         <h1>PostHog Replay Explorer</h1>
-        <p>Walk the API chain to inspect projects, recordings, and replay snapshot events.</p>
+        <p>Walk the API chain: projects, recordings, then snapshot blob sources and selected blobs.</p>
       </header>
 
       {error ? <div className="error-banner">{error}</div> : null}
@@ -167,7 +250,9 @@ export default function Page() {
                   setSelectedRecordingId('');
                   setRecordings([]);
                   setRecordingsRaw(null);
-                  setSnapshots(null);
+                  setSnapshotSources(null);
+                  setSelectedBlobKeys([]);
+                  setBlobData(null);
                 }}
               >
                 <strong>{project.name ?? 'Unnamed project'}</strong>
@@ -199,7 +284,9 @@ export default function Page() {
                 className={selectedRecordingId === recording.id ? 'list-item active' : 'list-item'}
                 onClick={() => {
                   setSelectedRecordingId(recording.id);
-                  setSnapshots(null);
+                  setSnapshotSources(null);
+                  setSelectedBlobKeys([]);
+                  setBlobData(null);
                 }}
               >
                 <strong>{recording.id}</strong>
@@ -212,30 +299,59 @@ export default function Page() {
 
         <article className="step-panel">
           <div className="step-header">
-            <h2>3. Retrieve Snapshots</h2>
+            <h2>3. Sources + Blob Selection</h2>
             <button
               type="button"
-              onClick={retrieveSnapshots}
+              onClick={retrieveSnapshotSources}
               disabled={!selectedProjectId || !selectedRecordingId || loading !== null}
             >
-              {loading === 'snapshots' ? 'Loading...' : 'Retrieve snapshots'}
+              {loading === 'sources' ? 'Loading...' : 'Retrieve snapshot sources'}
             </button>
           </div>
           <div className="status-line">
-            {selectedRecording
-              ? `Recording: ${selectedRecording.id}`
-              : 'Pick a session recording first'}
+            {selectedRecording ? `Recording: ${selectedRecording.id}` : 'Pick a session recording first'}
           </div>
-
-          {snapshots ? (
-            <div className="snapshot-summary">
-              <p>Blob ranges: {snapshots.chunks?.length ?? 0}</p>
-              <p>Total events: {snapshots.events?.length ?? 0}</p>
-              <p>Source entries: {snapshots.sources?.sources?.length ?? 0}</p>
-            </div>
-          ) : (
-            <div className="empty-state">Run snapshot retrieval to inspect replay payloads.</div>
-          )}
+          <div className="blob-controls">
+            <span>Selected blob keys: {selectedBlobKeys.length}/20</span>
+            <button
+              type="button"
+              onClick={retrieveSelectedBlobs}
+              disabled={selectedBlobKeys.length === 0 || loading !== null}
+            >
+              {loading === 'blobs' ? 'Loading...' : 'Retrieve selected blob data'}
+            </button>
+          </div>
+          <label className="toggle-line">
+            <input
+              type="checkbox"
+              checked={decompress}
+              onChange={(event) => setDecompress(event.target.checked)}
+              disabled={loading !== null}
+            />
+            <span>
+              decompress={decompress ? 'true' : 'false'} ({decompress ? 'JSONL payload' : 'snappy compressed payload'})
+            </span>
+          </label>
+          <div className="list-scroll">
+            {blobSources.map((source, idx) => {
+              const blobKey = String(source.blob_key ?? idx);
+              return (
+                <button
+                  type="button"
+                  key={`${blobKey}-${idx}`}
+                  className={selectedBlobKeys.includes(blobKey) ? 'list-item active' : 'list-item'}
+                  onClick={() => toggleBlobKey(blobKey)}
+                >
+                  <strong>blob_key: {blobKey}</strong>
+                  <span>Source: {source.source ?? 'blob_v2'}</span>
+                  <span>
+                    {source.start_timestamp ?? 'n/a'} to {source.end_timestamp ?? 'n/a'}
+                  </span>
+                </button>
+              );
+            })}
+            {!blobSources.length ? <div className="empty-state">Retrieve snapshot sources to list blob keys.</div> : null}
+          </div>
         </article>
       </section>
 
@@ -251,8 +367,13 @@ export default function Page() {
         </article>
 
         <article className="output-panel output-wide">
-          <h3>Snapshots API output</h3>
-          <pre>{snapshots ? formatJson(snapshots) : 'No snapshots payload yet.'}</pre>
+          <h3>Snapshot sources API output</h3>
+          <pre>{snapshotSources ? formatJson(snapshotSources) : 'No snapshot sources payload yet.'}</pre>
+        </article>
+
+        <article className="output-panel output-wide">
+          <h3>Selected blob data output</h3>
+          <pre>{blobData ? formatJson(blobData) : 'No selected blob data payload yet.'}</pre>
         </article>
       </section>
     </main>

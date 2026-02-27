@@ -149,6 +149,47 @@ button {
   font-size: 0.88rem;
 }
 
+.blob-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.blob-controls span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.blob-controls button {
+  border: 1px solid #3f4f69;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+  color: #f5faff;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.blob-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.toggle-line input {
+  margin: 0;
+}
+
 .output-grid {
   display: grid;
   gap: 12px;
