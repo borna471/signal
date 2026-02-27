@@ -12,10 +12,10 @@ export async function GET(request, { params }) {
   try {
     const { projectId } = await params;
     const { searchParams } = new URL(request.url);
-    const limit = asInt(searchParams.get('limit'), 50);
-    const pageSize = asInt(searchParams.get('pageSize'), Math.min(limit, 50));
+    const limit = asInt(searchParams.get('limit'), 200);
+    const pageSize = asInt(searchParams.get('pageSize'), Math.min(limit, 100));
     const since = searchParams.get('since');
-    const includeOngoing = searchParams.get('includeOngoing') === 'true';
+    const includeOngoing = searchParams.get('includeOngoing') !== 'false';
     const recordingId = searchParams.get('recordingId');
     const apiHostOverride = searchParams.get('apiHost');
     const { apiHost, personalKey } = await resolvePosthogRuntime(apiHostOverride);

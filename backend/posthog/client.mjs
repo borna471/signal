@@ -2,7 +2,12 @@
  * Performs an authenticated request to the PostHog API and returns JSON or raw response.
  */
 export async function apiRequest({ apiHost, personalKey, endpoint, expectJson = true }) {
-  const response = await fetch(`${apiHost}${endpoint}`, {
+  const requestUrl =
+    endpoint.startsWith('http://') || endpoint.startsWith('https://')
+      ? endpoint
+      : `${apiHost}${endpoint}`;
+
+  const response = await fetch(requestUrl, {
     headers: {
       Authorization: `Bearer ${personalKey}`,
       Accept: '*/*'
@@ -56,6 +61,9 @@ export async function resolveProjectId({ apiHost, personalKey, explicitProjectId
  */
 function buildRecordingsQuery({ pageSize, offset, since }) {
   const params = new URLSearchParams();
+  params.set('kind', 'RecordingsQuery');
+  params.set('order', 'start_time');
+  params.set('filter_test_accounts', 'false');
   params.set('limit', String(pageSize));
   params.set('offset', String(offset));
   if (since) {
@@ -69,21 +77,27 @@ function buildRecordingsQuery({ pageSize, offset, since }) {
  */
 export async function fetchRecordings({ apiHost, personalKey, projectId, opts }) {
   if (opts.recordingId) {
+    const params = new URLSearchParams();
+    params.set('kind', 'RecordingsQuery');
+    params.set('order', 'start_time');
+    params.set('session_ids', opts.recordingId);
+    params.set('limit', '100');
+
     const single = await apiRequest({
       apiHost,
       personalKey,
-      endpoint: `/api/projects/${projectId}/session_recordings/?session_ids=${encodeURIComponent(opts.recordingId)}`
+      endpoint: `/api/environments/${projectId}/session_recordings/?${params.toString()}`
     });
 
     return (single.results ?? []).filter((item) => item.id === opts.recordingId);
   }
 
   let offset = 0;
-  const all = [];
+  const allById = new Map();
 
-  while (all.length < opts.limit) {
+  while (allById.size < opts.limit) {
     const query = buildRecordingsQuery({
-      pageSize: Math.min(opts.pageSize, opts.limit - all.length),
+      pageSize: Math.min(opts.pageSize, opts.limit - allById.size),
       offset,
       since: opts.since
     });
@@ -91,23 +105,28 @@ export async function fetchRecordings({ apiHost, personalKey, projectId, opts })
     const page = await apiRequest({
       apiHost,
       personalKey,
-      endpoint: `/api/projects/${projectId}/session_recordings/?${query}`
+      endpoint: `/api/environments/${projectId}/session_recordings/?${query}`
     });
 
     const pageResults = (page.results ?? []).filter((recording) =>
       opts.includeOngoing ? true : !recording.ongoing
     );
 
-    all.push(...pageResults);
+    for (const recording of pageResults) {
+      if (recording?.id && !allById.has(recording.id)) {
+        allById.set(recording.id, recording);
+      }
+    }
 
-    if (!page.has_next || !page.results?.length) {
+    const hasNext = typeof page?.has_next === 'boolean' ? page.has_next : !!page?.next;
+    if (!hasNext || !page.results?.length) {
       break;
     }
 
     offset += page.results.length;
   }
 
-  return all.slice(0, opts.limit);
+  return [...allById.values()].slice(0, opts.limit);
 }
 
 function coerceBlobKey(blobKey) {
@@ -190,7 +209,7 @@ export async function fetchRecordingSnapshotSources({
   const sources = await apiRequest({
     apiHost,
     personalKey,
-    endpoint: `/api/projects/${projectId}/session_recordings/${recordingId}/snapshots/`
+    endpoint: `/api/environments/${projectId}/session_recordings/${recordingId}/snapshots/`
   });
 
   const blobSources = (sources.sources ?? []).filter((source) => source.source === 'blob_v2');
@@ -234,7 +253,7 @@ export async function fetchRecordingBlobData({
   const sources = await apiRequest({
     apiHost,
     personalKey,
-    endpoint: `/api/projects/${projectId}/session_recordings/${recordingId}/snapshots/`
+    endpoint: `/api/environments/${projectId}/session_recordings/${recordingId}/snapshots/`
   });
 
   const sourceBlobKeys = (sources.sources ?? [])
@@ -253,7 +272,7 @@ export async function fetchRecordingBlobData({
 
   for (const range of ranges) {
     const endpoint =
-      `/api/projects/${projectId}/session_recordings/${recordingId}/snapshots/` +
+      `/api/environments/${projectId}/session_recordings/${recordingId}/snapshots/` +
       `?source=blob_v2&start_blob_key=${range.start}&end_blob_key=${range.end}` +
       `&decompress=${decompress ? 'true' : 'false'}`;
 

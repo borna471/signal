@@ -294,7 +294,7 @@ async function exportRecordingSnapshots({ apiHost, personalKey, projectId, recor
   const sources = await apiRequest({
     apiHost,
     personalKey,
-    endpoint: `/api/projects/${projectId}/session_recordings/${recording.id}/snapshots/`
+    endpoint: `/api/environments/${projectId}/session_recordings/${recording.id}/snapshots/`
   });
 
   await fs.writeFile(path.join(recordingDir, 'sources.json'), `${JSON.stringify(sources, null, 2)}\n`, 'utf8');
@@ -309,7 +309,7 @@ async function exportRecordingSnapshots({ apiHost, personalKey, projectId, recor
 
   for (const range of ranges) {
     const endpoint =
-      `/api/projects/${projectId}/session_recordings/${recording.id}/snapshots/` +
+      `/api/environments/${projectId}/session_recordings/${recording.id}/snapshots/` +
       `?source=blob_v2&start_blob_key=${range.start}&end_blob_key=${range.end}`;
 
     const response = await apiRequest({

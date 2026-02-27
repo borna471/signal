@@ -146,7 +146,7 @@ export default function Page() {
 
     try {
       const response = await fetch(
-        `/api/posthog/projects/${encodeURIComponent(selectedProjectId)}/recordings?limit=100&pageSize=50`
+        `/api/posthog/projects/${encodeURIComponent(selectedProjectId)}/recordings?limit=1000&pageSize=100&includeOngoing=true`
       );
       const payload = await response.json();
 
